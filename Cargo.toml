@@ -1,13 +1,13 @@
 [package]
 description = "Extract Mindful Sessions from your Apple Health export data for use by Bloom"
-name = "bloomparse"
+name = "bloom-parse"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
 
 [package.metadata.winresource]
 LegalCopyright = "Copyright © 2024 Meditation Mind"
-OriginalFilename = "bloomparse.exe"
+OriginalFilename = "bloom-parse.exe"
 
 [dependencies]
 chrono = { version = "0.4.38", features = ["serde"] }
