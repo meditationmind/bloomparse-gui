@@ -85,6 +85,8 @@ struct BloomRecord {
     occurred_at: chrono::DateTime<Utc>,
     #[serde(rename = "Duration")]
     meditation_minutes: i32,
+    #[serde(rename = "Dropped Seconds")]
+    dropped_seconds: i32,
 }
 
 impl BloomRecord {
@@ -100,12 +102,16 @@ impl BloomRecord {
             chrono::NaiveDateTime::parse_from_str(&user_record.end, "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .and_utc();
-        let meditation_minutes: i32 = (end_time - occurred_at).num_minutes().try_into()?;
+        //let meditation_minutes: i32 = (end_time - occurred_at).num_minutes().try_into()?;
+        let num_seconds: i32 = (end_time - occurred_at).num_seconds().try_into()?;
+        let meditation_minutes = num_seconds / 60;
+        let dropped_seconds = num_seconds % 60;
 
         Ok(BloomRecord {
             app_name,
             occurred_at,
             meditation_minutes,
+            dropped_seconds,
         })
     }
 
