@@ -83,10 +83,10 @@ struct BloomRecord {
     app_name: String,
     #[serde(rename = "Start Time")]
     occurred_at: chrono::DateTime<Utc>,
-    #[serde(rename = "Duration")]
+    #[serde(rename = "Minutes")]
     meditation_minutes: i32,
-    #[serde(rename = "Dropped Seconds")]
-    dropped_seconds: i32,
+    #[serde(rename = "Seconds")]
+    meditation_seconds: i32,
 }
 
 impl BloomRecord {
@@ -105,13 +105,13 @@ impl BloomRecord {
         //let meditation_minutes: i32 = (end_time - occurred_at).num_minutes().try_into()?;
         let num_seconds: i32 = (end_time - occurred_at).num_seconds().try_into()?;
         let meditation_minutes = num_seconds / 60;
-        let dropped_seconds = num_seconds % 60;
+        let meditation_seconds = num_seconds % 60;
 
         Ok(BloomRecord {
             app_name,
             occurred_at,
             meditation_minutes,
-            dropped_seconds,
+            meditation_seconds,
         })
     }
 
@@ -127,7 +127,7 @@ impl BloomRecord {
         let filename = output_file.unwrap();
         let mut wtr = csv::WriterBuilder::new().from_path(&filename)?;
         for record in bloom_data {
-            if record.meditation_minutes == 0 {
+            if record.meditation_minutes == 0 && record.meditation_seconds == 0 {
                 continue;
             }
             wtr.serialize(record)?;
