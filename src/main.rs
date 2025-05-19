@@ -1,36 +1,41 @@
 #![allow(dead_code)]
+#![warn(clippy::pedantic, clippy::unwrap_used)]
 #![windows_subsystem = "windows"]
 
 extern crate tinyfiledialogs;
 
-use chrono::{self, Utc};
-use quick_xml::events::attributes::AttrError;
-use quick_xml::events::{BytesStart, Event};
-use quick_xml::Reader;
-use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Write as _;
+use std::fs::File;
+use std::io::BufReader;
+use std::num::TryFromIntError;
 use std::path::PathBuf;
+
+use chrono::{self, DateTime, NaiveDateTime, Utc};
+use csv::{Error as CsvError, WriterBuilder};
+use quick_xml::events::{attributes::AttrError, BytesStart, Event};
+use quick_xml::{DeError, Error as QuickXmlError, Reader};
+use serde::{Deserialize, Serialize};
 use tinyfiledialogs::{MessageBoxIcon, YesNo};
 
 #[derive(Debug)]
 enum AppError {
     /// XML parsing error
-    Xml(quick_xml::Error),
-    /// Not a MindfulSession record
+    Xml(QuickXmlError),
+    /// Not a `MindfulSession` record
     NoRecord(String),
 }
 
-impl From<quick_xml::Error> for AppError {
-    fn from(error: quick_xml::Error) -> Self {
+impl From<QuickXmlError> for AppError {
+    fn from(error: QuickXmlError) -> Self {
         Self::Xml(error)
     }
 }
 
 impl From<AttrError> for AppError {
     fn from(error: AttrError) -> Self {
-        Self::Xml(quick_xml::Error::InvalidAttr(error))
+        Self::Xml(QuickXmlError::InvalidAttr(error))
     }
 }
 
@@ -45,10 +50,10 @@ struct MindfulSession {
 }
 
 impl MindfulSession {
-    async fn new_from_element(
-        reader: &mut Reader<std::io::BufReader<std::fs::File>>,
-        element: BytesStart<'_>,
-    ) -> Result<Option<MindfulSession>, quick_xml::Error> {
+    fn new_from_element(
+        reader: &mut Reader<BufReader<File>>,
+        element: &BytesStart<'_>,
+    ) -> Result<Option<MindfulSession>, QuickXmlError> {
         let mut activity = Cow::Borrowed("");
         let mut app = Cow::Borrowed("");
         let mut start = Cow::Borrowed("");
@@ -82,7 +87,7 @@ struct BloomRecord {
     #[serde(rename = "App Name")]
     app_name: String,
     #[serde(rename = "Start Time")]
-    occurred_at: chrono::DateTime<Utc>,
+    occurred_at: DateTime<Utc>,
     #[serde(rename = "Minutes")]
     meditation_minutes: i32,
     #[serde(rename = "Seconds")]
@@ -90,18 +95,14 @@ struct BloomRecord {
 }
 
 impl BloomRecord {
-    async fn new_from_user_data(
-        user_record: MindfulSession,
-    ) -> Result<BloomRecord, std::num::TryFromIntError> {
+    fn new_from_user_data(user_record: MindfulSession) -> Result<BloomRecord, TryFromIntError> {
         let app_name = user_record.app;
-        let occurred_at =
-            chrono::NaiveDateTime::parse_from_str(&user_record.start, "%Y-%m-%d %H:%M:%S %z")
-                .unwrap()
-                .and_utc();
-        let end_time =
-            chrono::NaiveDateTime::parse_from_str(&user_record.end, "%Y-%m-%d %H:%M:%S %z")
-                .unwrap()
-                .and_utc();
+        let occurred_at = NaiveDateTime::parse_from_str(&user_record.start, "%Y-%m-%d %H:%M:%S %z")
+            .unwrap_or_default()
+            .and_utc();
+        let end_time = NaiveDateTime::parse_from_str(&user_record.end, "%Y-%m-%d %H:%M:%S %z")
+            .unwrap_or_default()
+            .and_utc();
         //let meditation_minutes: i32 = (end_time - occurred_at).num_minutes().try_into()?;
         let num_seconds: i32 = (end_time - occurred_at).num_seconds().try_into()?;
         let meditation_minutes = num_seconds / 60;
@@ -115,17 +116,15 @@ impl BloomRecord {
         })
     }
 
-    async fn write_csv(bloom_data: &Vec<BloomRecord>) -> Result<String, csv::Error> {
+    fn write_csv(bloom_data: &Vec<BloomRecord>) -> Result<String, CsvError> {
         let output_file =
-            tinyfiledialogs::save_file_dialog("Save Mindful Session CSV", "bloom-data-ah.csv")
-                .map(String::from);
+            tinyfiledialogs::save_file_dialog("Save Mindful Session CSV", "bloom-data-ah.csv");
 
-        if output_file.is_none() {
+        let Some(filename) = output_file else {
             return Ok("abort".to_owned());
-        }
+        };
 
-        let filename = output_file.unwrap();
-        let mut wtr = csv::WriterBuilder::new().from_path(&filename)?;
+        let mut wtr = WriterBuilder::new().from_path(&filename)?;
         for record in bloom_data {
             if record.meditation_minutes == 0 && record.meditation_seconds == 0 {
                 continue;
@@ -137,10 +136,10 @@ impl BloomRecord {
         Ok(filename)
     }
 
-    async fn calculate_stats(bloom_data: Vec<BloomRecord>) -> Result<String, std::io::Error> {
+    fn calculate_stats(bloom_data: &[BloomRecord]) -> String {
         let mut stats = String::new();
         let mut stats_hash: HashMap<String, i32> = HashMap::new();
-        for record in &bloom_data {
+        for record in bloom_data {
             if let Some(value) = stats_hash.get_mut(&record.app_name) {
                 *value += 1;
             } else {
@@ -163,11 +162,11 @@ impl BloomRecord {
             );
         }
 
-        Ok(stats)
+        stats
     }
 }
 
-async fn apple_health(file: &PathBuf) -> Result<(), quick_xml::DeError> {
+fn apple_health(file: &PathBuf) -> Result<(), DeError> {
     let mut reader = Reader::from_file(file)?;
 
     let mut user_data: Vec<MindfulSession> = Vec::new();
@@ -181,13 +180,10 @@ async fn apple_health(file: &PathBuf) -> Result<(), quick_xml::DeError> {
         match event {
             Event::Empty(element) => {
                 if element.name().as_ref() == b"Record" {
-                    if let Some(entry) = MindfulSession::new_from_element(&mut reader, element)
-                        .await
-                        .unwrap()
+                    if let Some(entry) =
+                        MindfulSession::new_from_element(&mut reader, &element).unwrap_or(None)
                     {
                         user_data.push(entry);
-                    } else {
-                        continue;
                     }
                 }
             }
@@ -197,7 +193,13 @@ async fn apple_health(file: &PathBuf) -> Result<(), quick_xml::DeError> {
     }
 
     for record in user_data {
-        bloom_data.push(BloomRecord::new_from_user_data(record).await.unwrap());
+        let Ok(processed_record) = BloomRecord::new_from_user_data(record) else {
+            continue;
+        };
+        if processed_record.occurred_at == DateTime::UNIX_EPOCH {
+            continue;
+        }
+        bloom_data.push(processed_record);
     }
 
     if bloom_data.len().eq(&0) {
@@ -215,8 +217,15 @@ async fn apple_health(file: &PathBuf) -> Result<(), quick_xml::DeError> {
     //    else { map.insert(record.app_name.as_str(), vec![(record.occurred_at, record.meditation_minutes)]); }
     //}
 
-    let filename = BloomRecord::write_csv(&bloom_data).await.unwrap();
-    let stats = BloomRecord::calculate_stats(bloom_data).await.unwrap();
+    let Ok(filename) = BloomRecord::write_csv(&bloom_data) else {
+        tinyfiledialogs::message_box_ok(
+            "Bloom Bot Parser",
+            "Mindful Session extraction failed. Please try again or contact server staff for assistance.",
+            MessageBoxIcon::Warning,
+        );
+        return Ok(());
+    };
+    let stats = BloomRecord::calculate_stats(&bloom_data);
 
     if filename == "abort" {
         tinyfiledialogs::message_box_ok(
@@ -230,9 +239,8 @@ async fn apple_health(file: &PathBuf) -> Result<(), quick_xml::DeError> {
     tinyfiledialogs::message_box_ok(
         "Bloom Bot Parser",
         format!(
-            "Mindful Session extraction successful!\n\n{}\nUpload {} to the #meditation-tracking channel and use /import to import the data into Bloom.",
-            stats,
-            filename.split("\\").last().unwrap()
+            "Mindful Session extraction successful!\n\n{stats}\nUpload {} to the #meditation-tracking channel and use /import to import the data into Bloom.",
+            filename.split('\\').next_back().unwrap_or("the CSV file")
         ).as_str(),
         MessageBoxIcon::Info,
     );
@@ -240,8 +248,7 @@ async fn apple_health(file: &PathBuf) -> Result<(), quick_xml::DeError> {
     Ok(())
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let proceed = tinyfiledialogs::message_box_yes_no(
         "Bloom Bot Parser",
         "This will extract all Mindful Sessions from your Apple Health data into a CSV file, which can be imported using Bloom. Proceed?",
@@ -258,26 +265,24 @@ async fn main() {
         return;
     }
 
-    let input_file = tinyfiledialogs::open_file_dialog(
+    let Some(input_file) = tinyfiledialogs::open_file_dialog(
         "Open Apple Health data",
         "/export.xml",
         Some((&["*.xml"], "Apple Health export data (*.xml)")),
     )
-    .map(PathBuf::from);
-
-    if input_file.is_none() {
+    .map(PathBuf::from) else {
         tinyfiledialogs::message_box_ok(
             "Bloom Bot Parser",
             "Mindful Session extraction cancelled.",
             MessageBoxIcon::Warning,
         );
         return;
-    }
+    };
 
-    if let Err(err) = apple_health(&input_file.unwrap()).await {
+    if let Err(err) = apple_health(&input_file) {
         tinyfiledialogs::message_box_ok(
             "Bloom Bot Parser",
-            format!("Error extracting Mindful Sessions: {}", err).as_str(),
+            format!("Error extracting Mindful Sessions: {err}").as_str(),
             MessageBoxIcon::Error,
         );
     }
