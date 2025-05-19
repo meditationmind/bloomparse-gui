@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 use chrono::{self, DateTime, NaiveDateTime, Utc};
 use csv::{Error as CsvError, WriterBuilder};
-use quick_xml::events::{attributes::AttrError, BytesStart, Event};
+use quick_xml::events::{BytesStart, Event, attributes::AttrError};
 use quick_xml::{DeError, Error as QuickXmlError, Reader};
 use serde::{Deserialize, Serialize};
 use tinyfiledialogs::{MessageBoxIcon, YesNo};

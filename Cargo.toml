@@ -1,8 +1,8 @@
 [package]
 description = "Extract Mindful Sessions from your Apple Health export data for use by Bloom"
 name = "bloom-parse"
-version = "0.1.0"
-edition = "2021"
+version = "0.1.2"
+edition = "2024"
 build = "build.rs"
 
 [package.metadata.winresource]
