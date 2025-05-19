@@ -16,5 +16,6 @@ Added seconds handling.
 
 Initial release.
 
+[0.1.2]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.2
 [0.1.1]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.1
 [0.1.0]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.0
