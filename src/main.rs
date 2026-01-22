@@ -179,12 +179,11 @@ fn apple_health(file: &PathBuf) -> Result<(), DeError> {
 
         match event {
             Event::Empty(element) => {
-                if element.name().as_ref() == b"Record" {
-                    if let Some(entry) =
+                if element.name().as_ref() == b"Record"
+                    && let Some(entry) =
                         MindfulSession::new_from_element(&mut reader, &element).unwrap_or(None)
-                    {
-                        user_data.push(entry);
-                    }
+                {
+                    user_data.push(entry);
                 }
             }
             Event::Eof => break,
