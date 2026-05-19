@@ -11,7 +11,7 @@ use std::io::BufReader;
 use std::num::TryFromIntError;
 use std::path::PathBuf;
 
-use chrono::{self, DateTime, NaiveDateTime, Utc};
+use chrono::{self, DateTime, Utc};
 use csv::{Error as CsvError, WriterBuilder};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{DeError, Error as QuickXmlError, Reader, XmlVersion};
@@ -78,12 +78,12 @@ struct BloomRecord {
 impl BloomRecord {
     fn new_from_user_data(user_record: MindfulSession) -> Result<BloomRecord, TryFromIntError> {
         let app_name = user_record.app;
-        let occurred_at = NaiveDateTime::parse_from_str(&user_record.start, "%Y-%m-%d %H:%M:%S %z")
+        let occurred_at = DateTime::parse_from_str(&user_record.start, "%Y-%m-%d %H:%M:%S %z")
             .unwrap_or_default()
-            .and_utc();
-        let end_time = NaiveDateTime::parse_from_str(&user_record.end, "%Y-%m-%d %H:%M:%S %z")
+            .to_utc();
+        let end_time = DateTime::parse_from_str(&user_record.end, "%Y-%m-%d %H:%M:%S %z")
             .unwrap_or_default()
-            .and_utc();
+            .to_utc();
         let num_seconds: i32 = (end_time - occurred_at).num_seconds().try_into()?;
         let meditation_minutes = num_seconds / 60;
         let meditation_seconds = num_seconds % 60;
