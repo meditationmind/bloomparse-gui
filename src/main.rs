@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use chrono::{self, DateTime, NaiveDateTime, Utc};
 use csv::{Error as CsvError, WriterBuilder};
 use quick_xml::events::{BytesStart, Event, attributes::AttrError};
-use quick_xml::{DeError, Error as QuickXmlError, Reader};
+use quick_xml::{DeError, Error as QuickXmlError, Reader, XmlVersion};
 use serde::{Deserialize, Serialize};
 use tinyfiledialogs::{MessageBoxIcon, YesNo};
 
@@ -54,30 +54,32 @@ impl MindfulSession {
         reader: &mut Reader<BufReader<File>>,
         element: &BytesStart<'_>,
     ) -> Result<Option<MindfulSession>, QuickXmlError> {
-        let mut activity = Cow::Borrowed("");
+        let version = XmlVersion::default();
+        let decoder = reader.decoder();
+
         let mut app = Cow::Borrowed("");
         let mut start = Cow::Borrowed("");
         let mut end = Cow::Borrowed("");
 
-        for attr_result in element.attributes() {
-            let a = attr_result?;
+        for a in element.attributes().flatten() {
             match a.key.as_ref() {
-                b"type" => activity = a.decode_and_unescape_value(reader.decoder())?,
-                b"sourceName" => app = a.decode_and_unescape_value(reader.decoder())?,
-                b"startDate" => start = a.decode_and_unescape_value(reader.decoder())?,
-                b"endDate" => end = a.decode_and_unescape_value(reader.decoder())?,
-                _ => (),
+                b"type"
+                    if a.decoded_and_normalized_value(version, decoder)?
+                        != "HKCategoryTypeIdentifierMindfulSession" =>
+                {
+                    return Ok(None);
+                }
+                b"sourceName" => app = a.decoded_and_normalized_value(version, decoder)?,
+                b"startDate" => start = a.decoded_and_normalized_value(version, decoder)?,
+                b"endDate" => end = a.decoded_and_normalized_value(version, decoder)?,
+                _ => {}
             }
         }
 
-        if activity != "HKCategoryTypeIdentifierMindfulSession" {
-            return Ok(None);
-        }
-
         Ok(Some(MindfulSession {
-            app: app.into(),
-            start: start.into(),
-            end: end.into(),
+            app: app.into_owned(),
+            start: start.into_owned(),
+            end: end.into_owned(),
         }))
     }
 }
