@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![warn(clippy::pedantic, clippy::unwrap_used)]
 #![windows_subsystem = "windows"]
 
@@ -14,30 +13,10 @@ use std::path::PathBuf;
 
 use chrono::{self, DateTime, NaiveDateTime, Utc};
 use csv::{Error as CsvError, WriterBuilder};
-use quick_xml::events::{BytesStart, Event, attributes::AttrError};
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::{DeError, Error as QuickXmlError, Reader, XmlVersion};
 use serde::{Deserialize, Serialize};
 use tinyfiledialogs::{MessageBoxIcon, YesNo};
-
-#[derive(Debug)]
-enum AppError {
-    /// XML parsing error
-    Xml(QuickXmlError),
-    /// Not a `MindfulSession` record
-    NoRecord(String),
-}
-
-impl From<QuickXmlError> for AppError {
-    fn from(error: QuickXmlError) -> Self {
-        Self::Xml(error)
-    }
-}
-
-impl From<AttrError> for AppError {
-    fn from(error: AttrError) -> Self {
-        Self::Xml(QuickXmlError::InvalidAttr(error))
-    }
-}
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct MindfulSession {
@@ -105,7 +84,6 @@ impl BloomRecord {
         let end_time = NaiveDateTime::parse_from_str(&user_record.end, "%Y-%m-%d %H:%M:%S %z")
             .unwrap_or_default()
             .and_utc();
-        //let meditation_minutes: i32 = (end_time - occurred_at).num_minutes().try_into()?;
         let num_seconds: i32 = (end_time - occurred_at).num_seconds().try_into()?;
         let meditation_minutes = num_seconds / 60;
         let meditation_seconds = num_seconds % 60;
@@ -152,9 +130,7 @@ impl BloomRecord {
         let mut stats_sorted: Vec<(&String, &i32)> = stats_hash.iter().collect();
         stats_sorted.sort_by(|a, b| a.1.cmp(b.1));
 
-        //for key in stats_hash.keys() {
         for (app, total) in stats_sorted {
-            //let _ = writeln!(stats, "{key}: {} entries", stats_hash[key]);
             let _ = writeln!(
                 stats,
                 "{}: {} {}",
@@ -211,12 +187,6 @@ fn apple_health(file: &PathBuf) -> Result<(), DeError> {
         );
         return Ok(());
     }
-
-    //let mut map: HashMap<&str, Vec<(chrono::DateTime<Utc>, i32)>> = HashMap::new();
-    //for record in &bloom_data {
-    //    if let Some(key) = map.get_mut(record.app_name.as_str()) { key.push((record.occurred_at, record.meditation_minutes)) }
-    //    else { map.insert(record.app_name.as_str(), vec![(record.occurred_at, record.meditation_minutes)]); }
-    //}
 
     let Ok(filename) = BloomRecord::write_csv(&bloom_data) else {
         tinyfiledialogs::message_box_ok(
