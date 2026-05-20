@@ -5,6 +5,10 @@ version = "0.1.2"
 edition = "2024"
 build = "build.rs"
 
+[profile.release]
+lto = true
+codegen-units = 1
+
 [package.metadata.winresource]
 LegalCopyright = "Copyright © 2024 Meditation Mind"
 OriginalFilename = "bloom-parse.exe"
