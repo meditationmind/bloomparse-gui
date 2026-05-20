@@ -4,7 +4,6 @@
 extern crate tinyfiledialogs;
 
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs::File;
 use std::io::BufReader;
@@ -15,6 +14,7 @@ use chrono::{self, DateTime, Utc};
 use csv::{Error as CsvError, WriterBuilder};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{DeError, Error as QuickXmlError, Reader, XmlVersion};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use tinyfiledialogs::{MessageBoxIcon, YesNo};
 
@@ -118,26 +118,22 @@ impl BloomRecord {
 
     fn calculate_stats(bloom_data: &[BloomRecord]) -> String {
         let mut stats = String::new();
-        let mut stats_hash: HashMap<String, i32> = HashMap::new();
+        let mut stats_hash: FxHashMap<&str, i32> = FxHashMap::default();
+
         for record in bloom_data {
-            if let Some(value) = stats_hash.get_mut(&record.app_name) {
-                *value += 1;
-            } else {
-                stats_hash.insert(record.app_name.clone(), 1);
-            }
+            stats_hash
+                .entry(record.app_name.as_str())
+                .and_modify(|v| *v += 1)
+                .or_insert(1);
         }
 
-        let mut stats_sorted: Vec<(&String, &i32)> = stats_hash.iter().collect();
-        stats_sorted.sort_by(|a, b| a.1.cmp(b.1));
+        let mut stats_sorted: Vec<(&str, i32)> = stats_hash.into_iter().collect();
+        stats_sorted.sort_by_key(|a| a.1);
+        stats_sorted.reverse();
 
         for (app, total) in stats_sorted {
-            let _ = writeln!(
-                stats,
-                "{}: {} {}",
-                app,
-                total,
-                if *total == 1 { "entry" } else { "entries" }
-            );
+            let entry = if total == 1 { "entry" } else { "entries" };
+            let _ = writeln!(stats, "{app}: {total} {entry}");
         }
 
         stats
