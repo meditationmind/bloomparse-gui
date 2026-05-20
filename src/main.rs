@@ -174,7 +174,7 @@ fn apple_health(file: &Path) -> Result<(), DeError> {
 
     if bloom_data.len().eq(&0) {
         tinyfiledialogs::message_box_ok(
-            "Bloom Bot Parser",
+            "Bloom Data Parser",
             "No Mindful Session entries found.",
             MessageBoxIcon::Warning,
         );
@@ -183,7 +183,7 @@ fn apple_health(file: &Path) -> Result<(), DeError> {
 
     let Ok(filename) = BloomRecord::write_csv(&bloom_data) else {
         tinyfiledialogs::message_box_ok(
-            "Bloom Bot Parser",
+            "Bloom Data Parser",
             "Mindful Session extraction failed. Please try again or contact server staff for assistance.",
             MessageBoxIcon::Warning,
         );
@@ -192,7 +192,7 @@ fn apple_health(file: &Path) -> Result<(), DeError> {
 
     if filename == "abort" {
         tinyfiledialogs::message_box_ok(
-            "Bloom Bot Parser",
+            "Bloom Data Parser",
             "Mindful Session extraction cancelled.",
             MessageBoxIcon::Warning,
         );
@@ -202,7 +202,7 @@ fn apple_health(file: &Path) -> Result<(), DeError> {
     let stats = BloomRecord::calculate_stats(&bloom_data);
 
     tinyfiledialogs::message_box_ok(
-        "Bloom Bot Parser",
+        "Bloom Data Parser",
         format!(
             "Mindful Session extraction successful!\n\n{stats}\nUpload {} to the #meditation-tracking channel and use /import to import the data into Bloom.",
             filename.split('\\').next_back().unwrap_or("the CSV file")
@@ -215,7 +215,7 @@ fn apple_health(file: &Path) -> Result<(), DeError> {
 
 fn main() {
     let proceed = tinyfiledialogs::message_box_yes_no(
-        "Bloom Bot Parser",
+        "Bloom Data Parser",
         "This will extract all Mindful Sessions from your Apple Health data into a CSV file, which can be imported using Bloom. Proceed?",
         MessageBoxIcon::Question,
         YesNo::Yes,
@@ -223,7 +223,7 @@ fn main() {
 
     if let YesNo::No = proceed {
         tinyfiledialogs::message_box_ok(
-            "Bloom Bot Parser",
+            "Bloom Data Parser",
             "Mindful Session extraction cancelled.",
             MessageBoxIcon::Warning,
         );
@@ -237,7 +237,7 @@ fn main() {
     )
     .map(PathBuf::from) else {
         tinyfiledialogs::message_box_ok(
-            "Bloom Bot Parser",
+            "Bloom Data Parser",
             "Mindful Session extraction cancelled.",
             MessageBoxIcon::Warning,
         );
@@ -246,7 +246,7 @@ fn main() {
 
     if let Err(err) = apple_health(&input_file) {
         tinyfiledialogs::message_box_ok(
-            "Bloom Bot Parser",
+            "Bloom Data Parser",
             format!("Error extracting Mindful Sessions: {err}").as_str(),
             MessageBoxIcon::Error,
         );
