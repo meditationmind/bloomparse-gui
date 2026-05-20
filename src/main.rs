@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 use std::fs::File;
 use std::io::BufReader;
 use std::num::TryFromIntError;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::{self, DateTime, Utc};
 use csv::{Error as CsvError, WriterBuilder};
@@ -21,11 +21,11 @@ use tinyfiledialogs::{MessageBoxIcon, YesNo};
 #[derive(Debug, PartialEq, Deserialize)]
 struct MindfulSession {
     #[serde(rename = "@sourceName")]
-    pub app: String,
+    app: String,
     #[serde(rename = "@startDate")]
-    pub start: String,
+    start: String,
     #[serde(rename = "@endDate")]
-    pub end: String,
+    end: String,
 }
 
 impl MindfulSession {
@@ -106,10 +106,9 @@ impl BloomRecord {
 
         let mut wtr = WriterBuilder::new().from_path(&filename)?;
         for record in bloom_data {
-            if record.meditation_minutes == 0 && record.meditation_seconds == 0 {
-                continue;
+            if record.meditation_minutes > 0 || record.meditation_seconds > 0 {
+                wtr.serialize(record)?;
             }
-            wtr.serialize(record)?;
         }
         wtr.flush()?;
 
@@ -140,7 +139,7 @@ impl BloomRecord {
     }
 }
 
-fn apple_health(file: &PathBuf) -> Result<(), DeError> {
+fn apple_health(file: &Path) -> Result<(), DeError> {
     let mut reader = Reader::from_file(file)?;
 
     let mut user_data: Vec<MindfulSession> = Vec::new();
@@ -161,18 +160,16 @@ fn apple_health(file: &PathBuf) -> Result<(), DeError> {
                 }
             }
             Event::Eof => break,
-            _ => (),
+            _ => {}
         }
     }
 
     for record in user_data {
-        let Ok(processed_record) = BloomRecord::new_from_user_data(record) else {
-            continue;
-        };
-        if processed_record.occurred_at == DateTime::UNIX_EPOCH {
-            continue;
+        if let Ok(processed_record) = BloomRecord::new_from_user_data(record)
+            && processed_record.occurred_at != DateTime::UNIX_EPOCH
+        {
+            bloom_data.push(processed_record);
         }
-        bloom_data.push(processed_record);
     }
 
     if bloom_data.len().eq(&0) {
@@ -192,7 +189,6 @@ fn apple_health(file: &PathBuf) -> Result<(), DeError> {
         );
         return Ok(());
     };
-    let stats = BloomRecord::calculate_stats(&bloom_data);
 
     if filename == "abort" {
         tinyfiledialogs::message_box_ok(
@@ -202,6 +198,8 @@ fn apple_health(file: &PathBuf) -> Result<(), DeError> {
         );
         return Ok(());
     }
+
+    let stats = BloomRecord::calculate_stats(&bloom_data);
 
     tinyfiledialogs::message_box_ok(
         "Bloom Bot Parser",
