@@ -4,6 +4,11 @@
 Note: In this file, do not use the hard wrap in the middle of a sentence for compatibility with GitHub comment style markdown rendering.
 -->
 
+## [0.1.3] - 2026-05-20
+
+- Fixed time zone handling.
+- General size and performance improvements.
+
 ## [0.1.2] - 2025-05-20
 
 Add better error handling and migrate to Rust 2024.
@@ -16,6 +21,7 @@ Added seconds handling.
 
 Initial release.
 
+[0.1.3]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.3
 [0.1.2]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.2
 [0.1.1]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.1
 [0.1.0]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.0
