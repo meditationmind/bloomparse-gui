@@ -12,7 +12,7 @@ use chrono::{self, DateTime, Utc};
 use csv::{Error as CsvError, WriterBuilder};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{DeError, Error as QuickXmlError, Reader, XmlVersion};
-use rustc_hash::FxHashMap;
+use rapidhash::RapidHashMap;
 use serde::{Deserialize, Serialize};
 use tinyfiledialogs::{MessageBoxIcon, YesNo};
 
@@ -112,7 +112,7 @@ impl BloomRecord {
 
     fn calculate_stats(bloom_data: &[BloomRecord]) -> String {
         let mut stats = String::new();
-        let mut stats_hash: FxHashMap<&str, i32> = FxHashMap::default();
+        let mut stats_hash = RapidHashMap::default();
 
         for record in bloom_data {
             stats_hash
