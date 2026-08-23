@@ -135,7 +135,7 @@ fn apple_health(file: &Path) -> Result<(), DeError> {
 
     loop {
         match reader.read_event_into(&mut buf)? {
-            Event::Empty(element) => {
+            Event::Empty(element) | Event::Start(element) => {
                 if element.name().into_inner() == "Record"
                     && let Some(entry) = MindfulSession::new_from_element(&element).unwrap_or(None)
                     && let Ok(processed_record) = BloomRecord::new_from_user_data(entry)
