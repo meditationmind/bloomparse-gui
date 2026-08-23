@@ -5,8 +5,6 @@ extern crate tinyfiledialogs;
 
 use std::borrow::Cow;
 use std::fmt::Write as _;
-use std::fs::File;
-use std::io::BufReader;
 use std::num::TryFromIntError;
 use std::path::{Path, PathBuf};
 
@@ -30,27 +28,24 @@ struct MindfulSession {
 
 impl MindfulSession {
     fn new_from_element(
-        reader: &mut Reader<BufReader<File>>,
         element: &BytesStart<'_>,
     ) -> Result<Option<MindfulSession>, QuickXmlError> {
         let version = XmlVersion::default();
-        let decoder = reader.decoder();
 
         let mut app = Cow::Borrowed("");
         let mut start = Cow::Borrowed("");
         let mut end = Cow::Borrowed("");
 
         for a in element.attributes().flatten() {
-            match a.key.as_ref() {
-                b"type"
-                    if a.decoded_and_normalized_value(version, decoder)?
-                        != "HKCategoryTypeIdentifierMindfulSession" =>
+            match a.key.into_inner() {
+                "type"
+                    if a.normalized_value(version)? != "HKCategoryTypeIdentifierMindfulSession" =>
                 {
                     return Ok(None);
                 }
-                b"sourceName" => app = a.decoded_and_normalized_value(version, decoder)?,
-                b"startDate" => start = a.decoded_and_normalized_value(version, decoder)?,
-                b"endDate" => end = a.decoded_and_normalized_value(version, decoder)?,
+                "sourceName" => app = a.normalized_value(version)?,
+                "startDate" => start = a.normalized_value(version)?,
+                "endDate" => end = a.normalized_value(version)?,
                 _ => {}
             }
         }
@@ -152,9 +147,9 @@ fn apple_health(file: &Path) -> Result<(), DeError> {
 
         match event {
             Event::Empty(element) => {
-                if element.name().as_ref() == b"Record"
                     && let Some(entry) =
                         MindfulSession::new_from_element(&mut reader, &element).unwrap_or(None)
+                if element.name().into_inner() == "Record"
                 {
                     user_data.push(entry);
                 }
