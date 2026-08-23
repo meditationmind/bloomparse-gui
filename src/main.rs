@@ -1,5 +1,6 @@
-#![warn(clippy::pedantic, clippy::unwrap_used)]
-#![windows_subsystem = "windows"]
+#![warn(clippy::pedantic)]
+#![cfg_attr(not(test), windows_subsystem = "windows")]
+#![cfg_attr(test, windows_subsystem = "console")]
 
 extern crate tinyfiledialogs;
 
@@ -229,5 +230,50 @@ fn main() {
             format!("Error extracting Mindful Sessions: {err}").as_str(),
             MessageBoxIcon::Error,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_event() -> Result<(), DeError> {
+        let mut reader = Reader::from_str(
+            "<Record type=\"HKCategoryTypeIdentifierMindfulSession\" sourceName=\"Insight Timer\" sourceVersion=\"14.3.2.287\" creationDate=\"2018-10-28 00:44:29 +0900\" startDate=\"2018-10-28 00:33:23 +0900\" endDate=\"2018-10-28 00:44:20 +0900\" value=\"HKCategoryValueNotApplicable\"/>",
+        );
+        let event = reader.read_event()?;
+        if let Event::Empty(element) | Event::Start(element) = event {
+            let entry = MindfulSession::new_from_element(&element)?.unwrap();
+            assert_eq!(entry.app, "Insight Timer");
+            assert_eq!(entry.start, "2018-10-28 00:33:23 +0900");
+            assert_eq!(entry.end, "2018-10-28 00:44:20 +0900");
+
+            let record = BloomRecord::new_from_user_data(entry)
+                .map_err(|e| DeError::Custom(e.to_string()))?;
+            let time = DateTime::from_timestamp_millis(1_540_654_403_000).unwrap();
+            assert_eq!(record.app_name, "Insight Timer");
+            assert_eq!(record.occurred_at, time);
+            assert_eq!(record.meditation_minutes, 10i32);
+            assert_eq!(record.meditation_seconds, 57i32);
+        } else {
+            panic!("failed to read event");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_invalid_event() -> Result<(), DeError> {
+        let mut reader = Reader::from_str(
+            "<Record type=\"HKCategoryTypeIdentifierSleepAnalysis\" sourceName=\"Withings\" sourceVersion=\"4100100\" creationDate=\"2020-07-13 14:29:25 +0900\" startDate=\"2016-10-27 06:17:13 +0900\" endDate=\"2016-10-27 06:41:13 +0900\" value=\"HKCategoryValueSleepAnalysisAsleepUnspecified\">",
+        );
+        let event = reader.read_event()?;
+        if let Event::Empty(element) | Event::Start(element) = event {
+            let entry = MindfulSession::new_from_element(&element)?;
+            assert!(entry.is_none());
+        } else {
+            panic!("failed to read event");
+        }
+        Ok(())
     }
 }
