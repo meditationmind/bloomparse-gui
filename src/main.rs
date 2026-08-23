@@ -17,19 +17,19 @@ use serde::{Deserialize, Serialize};
 use tinyfiledialogs::{MessageBoxIcon, YesNo};
 
 #[derive(Debug, PartialEq, Deserialize)]
-struct MindfulSession {
+struct MindfulSession<'a> {
     #[serde(rename = "@sourceName")]
-    app: String,
+    app: Cow<'a, str>,
     #[serde(rename = "@startDate")]
-    start: String,
+    start: Cow<'a, str>,
     #[serde(rename = "@endDate")]
-    end: String,
+    end: Cow<'a, str>,
 }
 
-impl MindfulSession {
+impl<'a> MindfulSession<'_> {
     fn new_from_element(
-        element: &BytesStart<'_>,
-    ) -> Result<Option<MindfulSession>, QuickXmlError> {
+        element: &'a BytesStart<'_>,
+    ) -> Result<Option<MindfulSession<'a>>, QuickXmlError> {
         let version = XmlVersion::default();
 
         let mut app = Cow::Borrowed("");
@@ -50,11 +50,7 @@ impl MindfulSession {
             }
         }
 
-        Ok(Some(MindfulSession {
-            app: app.into_owned(),
-            start: start.into_owned(),
-            end: end.into_owned(),
-        }))
+        Ok(Some(MindfulSession { app, start, end }))
     }
 }
 
@@ -72,7 +68,7 @@ struct BloomRecord {
 
 impl BloomRecord {
     fn new_from_user_data(user_record: MindfulSession) -> Result<BloomRecord, TryFromIntError> {
-        let app_name = user_record.app;
+        let app_name = user_record.app.into_owned();
         let occurred_at = DateTime::parse_from_str(&user_record.start, "%Y-%m-%d %H:%M:%S %z")
             .unwrap_or_default()
             .to_utc();
@@ -91,21 +87,19 @@ impl BloomRecord {
         })
     }
 
-    fn write_csv(bloom_data: &Vec<BloomRecord>) -> Result<String, CsvError> {
-        let output_file =
+    fn write_csv(bloom_data: &Vec<BloomRecord>) -> Result<Option<String>, CsvError> {
+        let filename =
             tinyfiledialogs::save_file_dialog("Save Mindful Session CSV", "bloom-data-ah.csv");
 
-        let Some(filename) = output_file else {
-            return Ok("abort".to_owned());
-        };
-
-        let mut wtr = WriterBuilder::new().from_path(&filename)?;
-        for record in bloom_data {
-            if record.meditation_minutes > 0 || record.meditation_seconds > 0 {
-                wtr.serialize(record)?;
+        if let Some(filename) = &filename {
+            let mut wtr = WriterBuilder::new().from_path(filename)?;
+            for record in bloom_data {
+                if record.meditation_minutes > 0 || record.meditation_seconds > 0 {
+                    wtr.serialize(record)?;
+                }
             }
+            wtr.flush()?;
         }
-        wtr.flush()?;
 
         Ok(filename)
     }
@@ -136,35 +130,24 @@ impl BloomRecord {
 
 fn apple_health(file: &Path) -> Result<(), DeError> {
     let mut reader = Reader::from_file(file)?;
-
-    let mut user_data: Vec<MindfulSession> = Vec::new();
     let mut bloom_data: Vec<BloomRecord> = Vec::new();
-
     let mut buf = Vec::new();
 
     loop {
-        let event = reader.read_event_into(&mut buf)?;
-
-        match event {
+        match reader.read_event_into(&mut buf)? {
             Event::Empty(element) => {
-                    && let Some(entry) =
-                        MindfulSession::new_from_element(&mut reader, &element).unwrap_or(None)
                 if element.name().into_inner() == "Record"
+                    && let Some(entry) = MindfulSession::new_from_element(&element).unwrap_or(None)
+                    && let Ok(processed_record) = BloomRecord::new_from_user_data(entry)
+                    && processed_record.occurred_at != DateTime::UNIX_EPOCH
                 {
-                    user_data.push(entry);
+                    bloom_data.push(processed_record);
                 }
             }
             Event::Eof => break,
             _ => {}
         }
-    }
-
-    for record in user_data {
-        if let Ok(processed_record) = BloomRecord::new_from_user_data(record)
-            && processed_record.occurred_at != DateTime::UNIX_EPOCH
-        {
-            bloom_data.push(processed_record);
-        }
+        buf.clear();
     }
 
     if bloom_data.len().eq(&0) {
@@ -185,14 +168,14 @@ fn apple_health(file: &Path) -> Result<(), DeError> {
         return Ok(());
     };
 
-    if filename == "abort" {
+    let Some(filename) = filename else {
         tinyfiledialogs::message_box_ok(
             "Bloom Data Parser",
             "Mindful Session extraction cancelled.",
             MessageBoxIcon::Warning,
         );
         return Ok(());
-    }
+    };
 
     let stats = BloomRecord::calculate_stats(&bloom_data);
 
@@ -201,7 +184,8 @@ fn apple_health(file: &Path) -> Result<(), DeError> {
         format!(
             "Mindful Session extraction successful!\n\n{stats}\nUpload {} to the #meditation-tracking channel and use /import to import the data into Bloom.",
             filename.split('\\').next_back().unwrap_or("the CSV file")
-        ).as_str(),
+        )
+        .as_str(),
         MessageBoxIcon::Info,
     );
 
