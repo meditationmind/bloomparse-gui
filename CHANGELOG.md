@@ -4,6 +4,11 @@
 Note: In this file, do not use the hard wrap in the middle of a sentence for compatibility with GitHub comment style markdown rendering.
 -->
 
+## [0.1.4] - 2026-08-23
+
+- Now includes entries from apps using an alternate logging format.
+- Performance improvements.
+
 ## [0.1.3] - 2026-05-20
 
 - Fixed time zone handling.
@@ -21,6 +26,7 @@ Added seconds handling.
 
 Initial release.
 
+[0.1.4]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.4
 [0.1.3]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.3
 [0.1.2]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.2
 [0.1.1]: https://github.com/meditationmind/bloomparse-gui/releases/tag/v0.1.1
